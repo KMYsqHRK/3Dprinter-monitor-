@@ -21,7 +21,7 @@ from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Resp
 
 SERIAL_PORT = os.environ.get("PM_SERIAL", "COM7")
 BAUD = int(os.environ.get("PM_BAUD", "115200"))
-CAMERA_INDEX = int(os.environ.get("PM_CAMERA", "0"))
+CAMERA_INDEX = int(os.environ.get("PM_CAMERA", "1"))
 HOST = os.environ.get("PM_HOST", "127.0.0.1")
 HTTP_PORT = int(os.environ.get("PM_PORT", "8090"))
 FPS = float(os.environ.get("PM_FPS", "5"))
