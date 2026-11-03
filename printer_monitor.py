@@ -19,7 +19,7 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-SERIAL_PORT = os.environ.get("PM_SERIAL", "COM7")
+SERIAL_PORT = os.environ.get("PM_SERIAL", "COM4")
 BAUD = int(os.environ.get("PM_BAUD", "115200"))
 CAMERA_INDEX = int(os.environ.get("PM_CAMERA", "1"))
 HOST = os.environ.get("PM_HOST", "127.0.0.1")
