@@ -59,14 +59,16 @@ http://<この PC のアドレス>:8090/?token=<token.txt の中身>
 powershell.exe -ExecutionPolicy Bypass -File <このフォルダーのパス>\start.ps1
 ```
 
-## 設定（環境変数）
+## 設定（config.toml）
 
-| 変数 | 既定値 | 内容 |
+COM ポートやカメラ番号などは `config.toml` に書きます。同じ名前の環境変数を設定すると、そちらが優先されます（一時的に変えたいとき用）。トークンだけは秘密情報なので `config.toml` には書かず、`token.txt` / `PM_TOKEN` を使います。
+
+| 環境変数 | config.toml の項目 | 内容 |
 |---|---|---|
-| `PM_SERIAL` | `COM4` | プリンターの COM ポート |
-| `PM_BAUD` | `115200` | ボーレート |
-| `PM_CAMERA` | `1` | カメラ番号（この PC では 0 = 前面カメラ、1 = 背面カメラ） |
-| `PM_HOST` | `127.0.0.1` | 待ち受けアドレス（`start.ps1` では `0.0.0.0`） |
-| `PM_PORT` | `8090` | ポート |
-| `PM_FPS` | `5` | 配信のフレームレート |
-| `PM_TOKEN` | なし | 設定するとトークンが必須になる |
+| `PM_SERIAL` | `[printer] serial_port` | プリンターの COM ポート |
+| `PM_BAUD` | `[printer] baud` | ボーレート |
+| `PM_CAMERA` | `[camera] index` | カメラ番号（この PC では 0 = 前面カメラ、1 = 背面カメラ） |
+| `PM_HOST` | `[server] host` | 待ち受けアドレス（`start.ps1` では `0.0.0.0`） |
+| `PM_PORT` | `[server] port` | ポート |
+| `PM_FPS` | `[camera] fps` | 配信のフレームレート |
+| `PM_TOKEN` | （なし。環境変数のみ） | 設定するとトークンが必須になる |

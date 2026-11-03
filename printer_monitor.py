@@ -1,7 +1,8 @@
 """Ender-3 remote monitor: webcam MJPEG stream + pause/stop over USB serial.
 
 Run:  uv run printer_monitor.py
-Config (env vars): PM_SERIAL, PM_BAUD, PM_CAMERA, PM_HOST, PM_PORT, PM_FPS, PM_TOKEN
+Config: config.toml; env vars PM_SERIAL, PM_BAUD, PM_CAMERA, PM_HOST, PM_PORT, PM_FPS
+override it. PM_TOKEN is env-only (secret).
 """
 
 import collections
@@ -10,6 +11,7 @@ import os
 import re
 import threading
 import time
+import tomllib
 from contextlib import asynccontextmanager
 from pathlib import Path
 
@@ -19,16 +21,28 @@ import uvicorn
 from fastapi import FastAPI, HTTPException, Request
 from fastapi.responses import FileResponse, JSONResponse, RedirectResponse, Response, StreamingResponse
 
-SERIAL_PORT = os.environ.get("PM_SERIAL", "COM4")
-BAUD = int(os.environ.get("PM_BAUD", "115200"))
-CAMERA_INDEX = int(os.environ.get("PM_CAMERA", "1"))
-HOST = os.environ.get("PM_HOST", "127.0.0.1")
-HTTP_PORT = int(os.environ.get("PM_PORT", "8090"))
-FPS = float(os.environ.get("PM_FPS", "5"))
+HERE = Path(__file__).parent
+
+try:
+    CONFIG = tomllib.loads((HERE / "config.toml").read_text(encoding="utf-8"))
+except FileNotFoundError:
+    CONFIG = {}
+
+
+def cfg(section, key, env, default):
+    """Env var wins, then config.toml, then the built-in default."""
+    value = os.environ.get(env, CONFIG.get(section, {}).get(key, default))
+    return type(default)(value)
+
+
+SERIAL_PORT = cfg("printer", "serial_port", "PM_SERIAL", "COM4")
+BAUD = cfg("printer", "baud", "PM_BAUD", 115200)
+CAMERA_INDEX = cfg("camera", "index", "PM_CAMERA", 1)
+FPS = cfg("camera", "fps", "PM_FPS", 5.0)
+HOST = cfg("server", "host", "PM_HOST", "127.0.0.1")
+HTTP_PORT = cfg("server", "port", "PM_PORT", 8090)
 TOKEN = os.environ.get("PM_TOKEN", "")
 POLL_SECONDS = 5
-
-HERE = Path(__file__).parent
 
 # Marlin replies, e.g. "ok T:21.5 /0.0 B:21.0 /0.0 @:0 B@:0" and "SD printing byte 1234/56789"
 TEMP_RE = re.compile(r"T:([\d.]+)\s*/([\d.]+).*?B:([\d.]+)\s*/([\d.]+)")

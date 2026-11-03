@@ -1,0 +1,14 @@
+# Ender-3 モニターの設定。環境変数（PM_SERIAL など）を設定するとそちらが優先されます。
+# トークンは秘密情報なので、ここには書かず token.txt / PM_TOKEN を使います。
+
+[printer]
+serial_port = "COM4"   # プリンターの COM ポート（USB を差す場所で変わることがある）
+baud = 115200
+
+[camera]
+index = 1              # 0 = 前面カメラ、1 = 背面カメラ（この PC の場合）
+fps = 5                # 配信のフレームレート
+
+[server]
+host = "127.0.0.1"     # start.ps1 は 0.0.0.0 に上書きする
+port = 8090
