@@ -1,0 +1,14 @@
+[project]
+name = "printer-monitor"
+version = "0.1.0"
+description = "Ender-3 remote monitor: webcam stream + pause/stop over USB serial"
+requires-python = ">=3.11"
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "opencv-python",
+    "pyserial",
+]
+
+[tool.uv]
+package = false

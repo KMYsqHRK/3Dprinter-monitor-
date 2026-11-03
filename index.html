@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="theme-color" content="#111418">
+<title>Ender-3 モニター</title>
+<style>
+  :root {
+    --bg: #111418; --panel: #1b2027; --text: #e8ecf1; --muted: #8b95a3;
+    --ok: #3fb950; --warn: #d29922; --bad: #f85149; --btn: #2a313b;
+  }
+  * { box-sizing: border-box; }
+  body { margin: 0; background: var(--bg); color: var(--text);
+         font: 15px/1.5 system-ui, -apple-system, "Hiragino Sans", "Yu Gothic UI", sans-serif; }
+  main { max-width: 760px; margin: 0 auto; padding: 12px 16px 32px; }
+  h1 { font-size: 17px; margin: 4px 0 10px; display: flex; align-items: center; gap: 8px; }
+  .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--muted); }
+  .dot.ok { background: var(--ok); } .dot.bad { background: var(--bad); }
+  .cam { position: relative; background: #000; border-radius: 10px; overflow: hidden; aspect-ratio: 16/9; }
+  .cam img { width: 100%; height: 100%; object-fit: contain; display: block; }
+  .cam .msg { position: absolute; inset: 0; display: grid; place-items: center; color: var(--muted); }
+  .cam .msg[hidden] { display: none; }
+  .stats { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin: 12px 0; }
+  .stat { background: var(--panel); border-radius: 10px; padding: 8px 10px; }
+  .stat .k { color: var(--muted); font-size: 12px; }
+  .stat .v { font-size: 18px; font-variant-numeric: tabular-nums; }
+  .bar { height: 4px; background: var(--btn); border-radius: 2px; margin-top: 6px; overflow: hidden; }
+  .bar > div { height: 100%; width: 0; background: var(--ok); transition: width .5s; }
+  .buttons { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+  button { font: inherit; font-weight: 600; color: var(--text); background: var(--btn);
+           border: 0; border-radius: 10px; padding: 14px 8px; cursor: pointer; }
+  button:active { filter: brightness(1.3); }
+  button.stop { background: #6b3a12; grid-column: 1 / -1; }
+  button.emergency { background: var(--bad); grid-column: 1 / -1; }
+  button.reconnect { grid-column: 1 / -1; display: none; }
+  .note { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+  #toast { min-height: 1.5em; margin: 10px 0; font-size: 14px; }
+  details { margin-top: 14px; background: var(--panel); border-radius: 10px; padding: 8px 10px; }
+  summary { cursor: pointer; color: var(--muted); }
+  pre { margin: 8px 0 0; font-size: 12px; white-space: pre-wrap; word-break: break-all; max-height: 260px; overflow: auto; }
+</style>
+</head>
+<body>
+<main>
+  <h1><span id="dot" class="dot"></span>Ender-3 モニター</h1>
+
+  <div class="cam">
+    <img id="cam" alt="カメラ映像" src="stream">
+    <div id="camMsg" class="msg" hidden>カメラ映像なし</div>
+  </div>
+
+  <div class="stats">
+    <div class="stat"><div class="k">ノズル</div><div class="v" id="hotend">–</div></div>
+    <div class="stat"><div class="k">ベッド</div><div class="v" id="bed">–</div></div>
+    <div class="stat"><div class="k">SD 印刷</div><div class="v" id="progress">–</div>
+      <div class="bar"><div id="bar"></div></div></div>
+  </div>
+
+  <div class="buttons">
+    <button data-action="pause">一時停止</button>
+    <button data-action="resume">再開</button>
+    <button data-action="stop" class="stop"
+            data-confirm="印刷を中止してヒーターを切ります。再開はできません。よろしいですか？">中止して冷却</button>
+    <button data-action="emergency" class="emergency"
+            data-confirm="緊急停止（M112）します。プリンター本体のリセットが必要になります。よろしいですか？">緊急停止</button>
+    <button id="reconnect" class="reconnect"
+            data-confirm="再接続すると基板がリセットされ、実行中の SD 印刷が止まる可能性があります。続けますか？">プリンターに再接続</button>
+  </div>
+  <p class="note">一時停止中もノズルは加熱されたままです。長時間止めるなら「中止して冷却」を。</p>
+
+  <div id="toast"></div>
+
+  <details>
+    <summary>シリアルログ</summary>
+    <pre id="log"></pre>
+  </details>
+</main>
+
+<script>
+const $ = id => document.getElementById(id);
+const fmtTemp = (t, target) => t == null ? "–" : `${t.toFixed(0)}°` + (target ? ` / ${target.toFixed(0)}°` : "");
+
+function toast(text, color) {
+  $("toast").textContent = text;
+  $("toast").style.color = color || "";
+}
+
+async function refresh() {
+  try {
+    const r = await fetch("api/status", { cache: "no-store" });
+    if (!r.ok) throw new Error(r.status);
+    const s = await r.json();
+    const fresh = s.updated && s.now - s.updated < 20;
+    $("dot").className = "dot " + (s.connected && fresh ? "ok" : "bad");
+    $("hotend").textContent = fmtTemp(s.hotend, s.hotend_target);
+    $("bed").textContent = fmtTemp(s.bed, s.bed_target);
+    $("progress").textContent = s.sd_printing ? `${s.progress ?? 0}%` : (s.sd_printing === false ? "待機中" : "–");
+    $("bar").style.width = (s.sd_printing ? s.progress || 0 : 0) + "%";
+    $("reconnect").style.display = s.connected ? "none" : "block";
+    if (!s.connected) toast("プリンター未接続" + (s.error ? `: ${s.error}` : ""), "var(--bad)");
+    $("camMsg").hidden = s.camera;
+    $("log").textContent = s.log.join("\n");
+  } catch (e) {
+    $("dot").className = "dot bad";
+    toast("サーバーに接続できません", "var(--bad)");
+  }
+}
+
+async function post(path, label) {
+  toast(`${label} を送信中…`);
+  try {
+    const r = await fetch(path, { method: "POST" });
+    const body = await r.json().catch(() => ({}));
+    if (!r.ok) throw new Error(body.detail || r.status);
+    toast(`${label} を送信しました`, "var(--ok)");
+  } catch (e) {
+    toast(`${label} に失敗: ${e.message}`, "var(--bad)");
+  }
+  refresh();
+}
+
+document.querySelectorAll("button").forEach(b => b.addEventListener("click", () => {
+  if (b.dataset.confirm && !confirm(b.dataset.confirm)) return;
+  if (b.id === "reconnect") post("api/reconnect", b.textContent);
+  else post(`api/action/${b.dataset.action}`, b.textContent);
+}));
+
+// The MJPEG stream drops when the phone sleeps or the network blips; reopen it.
+$("cam").addEventListener("error", () => setTimeout(() => { $("cam").src = "stream?" + Date.now(); }, 2000));
+document.addEventListener("visibilitychange", () => {
+  if (!document.hidden) { $("cam").src = "stream?" + Date.now(); refresh(); }
+});
+
+refresh();
+setInterval(refresh, 3000);
+</script>
+</body>
+</html>
